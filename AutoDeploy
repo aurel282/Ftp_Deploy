@@ -1,0 +1,106 @@
+import os
+from ftplib import FTP
+# --------------------------------------------------
+
+
+class FTPCommunicator:
+
+    def __init__(self):
+
+        self.ftp = FTP()
+        self.ftp.connect('YOURFTP', port=21, timeout=30)
+        self.ftp.login(user="YOURUSER", passwd="YOURPASS")
+
+        files = self.ftp.dir()
+        print(files)
+    # --------------------------------------------------
+
+    def cleanOut(self):
+
+        for d in self.ftp.nlst():
+            if d != '.' and d != '..':
+                try:
+                    print('CO Del file: ' + d)
+                    self.ftp.delete(d)  # delete the file
+                except:
+                    self.ftp.cwd(d)  # it's actually a directory; clean it
+                    print('CO Del Dir: ' + d)
+                    self.cleanOut()
+                    self.ftp.cwd('..')
+                    self.ftp.rmd(d)
+
+    # --------------------------------------------------
+
+    def removedir(self, dirName):
+
+        self.ftp.cwd(dirName)
+        print('Del Dir:' + dirName)
+        for d in self.ftp.nlst():
+            if d != '.' and d != '..':
+                try:
+                    self.ftp.delete(d)
+                except Exception as e:
+                    print(e)
+                    try:
+                        self.ftp.cwd(d)
+                        print('Del file: ' + d)
+                        self.cleanOut()
+                        self.ftp.cwd('..')
+                        self.ftp.rmd(d)
+                    except Exception as e:
+                        print(e)
+                        pass
+                    else:
+                        try:
+                            #self.ftp.cwd(d)
+                            print('Recurse del: ' + d)
+                            self.removedir(d)
+                            self.ftp.cwd('..')
+                        except Exception as e:
+                            print(e)
+                            pass  # not a directory; ignore
+        self.ftp.cwd('..')
+        self.ftp.rmd(dirName)
+    # --------------------------------------------------
+
+    def quit(self):
+        self.ftp.quit()
+    # --------------------------------------------------
+
+    def copyDir(self, source, destination):
+
+        try:
+            self.ftp.cwd(destination)
+        except Exception as e:
+            self.ftp.mkd(destination)
+            self.ftp.cwd(destination)
+            print(e)
+
+        list = os.listdir(source)
+        for fname in list:
+            if os.path.isdir(source + fname):
+                try:
+                    self.ftp.cwd(fname)
+                except Exception as e:
+                    self.ftp.mkd(fname)
+                    self.ftp.cwd(fname)
+                    self.copyDir(source + fname + '\\', '')
+                    self.ftp.cwd('..')
+                    print(e)
+            else:
+                fh = open(source + fname, 'rb')
+                self.ftp.storbinary('STOR %s' % fname, fh)
+                fh.close()
+
+
+def main():
+    ftp = FTPCommunicator()
+    ftp.removedir("www")
+    ftp.copyDir("YOURORIGINFOLDER", "www")
+    ftp.quit()
+
+# --------------------------------------------------
+
+
+if __name__ == "__main__":
+    main()
